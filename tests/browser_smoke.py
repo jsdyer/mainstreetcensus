@@ -1,74 +1,55 @@
-"""Exercise the built starter at a project subpath in Chromium."""
+"""Exercise the real saved edition, static profiles and an editable comparison."""
 from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
-import shutil
-import tempfile
-import sys
+import os
 import threading
-from playwright.sync_api import sync_playwright
+import json
+from tempfile import TemporaryDirectory
+from playwright.sync_api import sync_playwright,expect
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from build import build
-
-
-class QuietHandler(SimpleHTTPRequestHandler):
-    def log_message(self, *args):
-        pass
+ROOT=Path(__file__).resolve().parents[1]
 
 
 def main():
-    screenshots = ROOT / "browser-checks"
-    screenshots.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory() as temporary:
-        shutil.copytree(ROOT / "dist", Path(temporary) / "example-tool")
-        example = Path(temporary) / "preset-fixture"
-        example.mkdir()
-        shutil.copytree(ROOT / "web", example / "web")
-        shutil.copytree(ROOT / "examples/common-pages", example / "common-pages")
-        for name in ("tool.json", "README.md"):
-            shutil.copyfile(ROOT / name, example / name)
-        build(example)
-        server = ThreadingHTTPServer(("127.0.0.1", 0), partial(QuietHandler, directory=temporary))
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+    ed=json.loads((ROOT/"dist/data/editions.json").read_text())["editions"][0]
+    rows=json.loads((ROOT/"dist/data"/ed["id"]/"7225.json").read_text())
+    with TemporaryDirectory() as folder:
+        Path(folder,"mainstreetcensus").symlink_to(ROOT/"dist",target_is_directory=True)
+        class Quiet(SimpleHTTPRequestHandler):
+            def log_message(self,*args):pass
+        server=ThreadingHTTPServer(("127.0.0.1",0),partial(Quiet,directory=folder))
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        url=f"http://127.0.0.1:{server.server_port}/mainstreetcensus/"
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch()
-                page = browser.new_page(viewport={"width": 1280, "height": 1000})
-                errors = []
-                page.on("pageerror", lambda error: errors.append(str(error)))
-                page.goto(f"http://127.0.0.1:{server.server_port}/example-tool/")
-                assert page.locator("#input").input_value() == "Halifax\nLangley\nHalifax\nVancouver"
-                assert page.locator("#output").input_value() == "Halifax\nLangley\nVancouver"
-                assert "1 duplicate removed" in page.locator("#status").inner_text()
-                page.locator("#input").fill('<img src=x onerror="alert(1)">\n<img src=x onerror="alert(1)">')
-                assert page.locator("#output").input_value() == '<img src=x onerror="alert(1)">'
-                assert page.locator("img").count() == 0
-                page.locator("#clear").click()
-                assert page.locator("#output").input_value() == ""
-                assert "Paste one item per line" in page.locator("#status").inner_text()
-                page.locator("#sample").click()
-                assert page.locator("#output").input_value() == "Halifax\nLangley\nVancouver"
-                page.screenshot(path=str(screenshots / "desktop.png"), full_page=True)
-                page.set_viewport_size({"width": 390, "height": 844})
-                page.goto(f"http://127.0.0.1:{server.server_port}/example-tool/")
-                assert page.locator("#input").bounding_box()["y"] < 844
-                assert page.locator("#output").input_value() == "Halifax\nLangley\nVancouver"
-                assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
-                page.screenshot(path=str(screenshots / "mobile.png"), full_page=True)
-                page.goto(f"http://127.0.0.1:{server.server_port}/preset-fixture/dist/remove-duplicate-cities/")
-                assert page.locator("#output").input_value() == "Vancouver\nHalifax\nCharlottetown"
-                page.locator("#input").fill("Surrey\nSurrey\nOttawa")
-                assert page.locator("#output").input_value() == "Surrey\nOttawa"
-                page.get_by_role("button", name="Restore example").click()
-                assert page.locator("#output").input_value() == "Vancouver\nHalifax\nCharlottetown"
-                assert not errors, errors
-                browser.close()
-            print("Browser checks passed: project subpath, sample, clear, safe text and mobile layout")
+                br=p.chromium.launch(executable_path=os.getenv("CHROMIUM_PATH") or None,args=["--no-sandbox"])
+                pg=br.new_page(viewport={"width":1280,"height":900})
+                pg.route("**/assets/tool-metrics.js",lambda route:route.fulfill(body=""))
+                pg.goto(url); expect(pg.locator("#compare")).to_be_visible()
+                expect(pg.locator("#result")).to_contain_text(f'{rows["5915001"][0]:,}')
+                (ROOT/"browser-checks").mkdir(exist_ok=True)
+                pg.screenshot(path=str(ROOT/"browser-checks/desktop.png"))
+                pg.set_viewport_size({"width":390,"height":844})
+                pg.get_by_label("First place").fill("Halifax Regional Municipality, NS · 1209034")
+                pg.get_by_label("Second place").fill("Halifax metro area · 205")
+                pg.get_by_role("button",name="Compare locations").click()
+                expect(pg.locator("#result")).to_contain_text(f'{rows["1209034"][0]:,}')
+                pg.get_by_text("See counts by employee-size band").click()
+                expect(pg.locator("#result table tbody tr")).to_have_count(8)
+                pg.reload();expect(pg.get_by_label("Second place")).to_have_value("Halifax metro area · 205")
+                pg.screenshot(path=str(ROOT/"browser-checks/mobile.png"))
+                assert pg.evaluate("document.documentElement.scrollWidth <= innerWidth")
+                pg.get_by_role("button",name="Use Langley example").click()
+                expect(pg.locator("#result")).to_contain_text("Township of Langley")
+                native=br.new_page(viewport={"width":320,"height":720},java_script_enabled=False)
+                native.goto(url+"records/halifax-restaurant-locations/")
+                expect(native.locator("main")).to_contain_text(f'{rows["205"][0]:,}')
+                native.get_by_role("link",name="Explore this industry across Canada").click()
+                native.get_by_role("link",name="Halifax metro area",exact=True).click()
+                expect(native.locator("h1")).to_contain_text("Halifax metro area")
+                assert native.evaluate("document.documentElement.scrollWidth <= innerWidth")
+                br.close()
         finally:
-            server.shutdown()
-
-
-if __name__ == "__main__":
-    main()
+            server.shutdown();thread.join()
+if __name__=="__main__":main()

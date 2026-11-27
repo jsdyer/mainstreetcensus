@@ -1,0 +1,40 @@
+name: Refresh Canadian Business Counts
+on:
+  schedule:
+    - cron: '19 14 15 * *'
+  workflow_dispatch:
+concurrency:
+  group: mainstreetcensus-refresh
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check Statistics Canada business count editions
+        run: python3 scripts/refresh.py
+      - run: python3 -m unittest discover -s tests -v
+      - run: node --test tests/*.test.mjs
+      - run: python3 scripts/build.py
+      - name: Publish the validated census edition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git diff --quiet -- web/data || [ -n "$(git ls-files --others --exclude-standard -- web/data)" ]; then
+            git add web/data
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh Canadian employer-location edition'
+            git push origin HEAD:main
+          fi
+          gh workflow run pages.yml --ref main

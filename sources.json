@@ -1,0 +1,13 @@
+{
+  "industries": ["2361", "3118", "4413", "4442", "4451", "4452", "4492", "4561", "4581", "4582", "4591", "4592", "4594", "4595", "5411", "5413", "5415", "6244", "7211", "7225", "8111", "8114", "8121"],
+  "names": {
+    "5915001": "Township of Langley",
+    "5915002": "City of Langley",
+    "1209034": "Halifax Regional Municipality"
+  },
+  "featured_areas": ["5915001", "5915002", "1209034", "5915004", "5915022", "5915015", "3520005", "3506008", "2466023", "4806016", "1102075"],
+  "comparisons": [
+    {"slug":"langley-restaurant-locations", "name":"Restaurant locations in Langley Township and Langley City", "a":"5915001", "b":"5915002", "industry":"7225", "context":"The Township of Langley and the City of Langley are separate municipalities inside the Vancouver metro area."},
+    {"slug":"halifax-restaurant-locations", "name":"Restaurant locations in Halifax municipality and metro area", "a":"1209034", "b":"205", "industry":"7225", "context":"The Halifax metro area includes Halifax Regional Municipality and surrounding communities. The two counts overlap."}
+  ]
+}

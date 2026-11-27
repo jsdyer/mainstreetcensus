@@ -1,16 +1,44 @@
 {
-  "id": "coolcode-tool-template",
-  "title": "CoolCode Tool Starter",
-  "description": "A browser-only example that trims lines and removes exact duplicates.",
-  "category": "security",
-  "tags": ["text", "lines", "duplicates"],
-  "icon": "scan-search",
-  "url": "/coolcode-tool-template/",
-  "source": "https://github.com/jsdyer/coolcode-tool-template",
+  "id": "mainstreetcensus",
+  "title": "Main Street Census",
+  "description": "Compare businesses with employees across Canadian municipalities and metro areas by industry and employee-size band.",
+  "category": "places",
+  "tags": [
+    "business counts",
+    "Statistics Canada",
+    "NAICS",
+    "municipalities",
+    "Canada",
+    "employer locations",
+    "retail"
+  ],
+  "icon": "map",
+  "url": "/mainstreetcensus/",
+  "source": "https://github.com/jsdyer/mainstreetcensus",
   "hosting": "project",
   "access": "browser",
   "data_info": {
-    "mode": "local",
-    "detail": "The browser reads the text you paste and compares its lines."
+    "mode": "snapshot",
+    "detail": "Statistics Canada’s semiannual Canadian Business Counts table reports employer locations by industry, geography and employee-size band. The source catalogue is checked monthly.",
+    "cadence": "Monthly",
+    "probes": [
+      {
+        "label": "Source catalogue and table checked",
+        "url": "https://coolcode.ca/mainstreetcensus/data/status.json",
+        "path": [
+          "checked_at"
+        ],
+        "count_at": {
+          "path": [
+            "geographies"
+          ],
+          "unit": "published areas"
+        }
+      }
+    ]
+  },
+  "result_directory": {
+    "path": "records/",
+    "title": "Canadian employer locations by place and industry"
   }
 }
