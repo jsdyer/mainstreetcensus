@@ -138,9 +138,11 @@ def write_pages(stage, tool, template):
             value=series(records,a,entry)[0]
             lines.append('<tr><th scope="row">'+anchor("../area-"+a+"/",area_name(a,geo,entry))+'</th><td>'+amount(value)+'</td><td>'+
                          anchor(compare_url("../../",entry,code,a,default["a"] if a!=default["a"] else default["b"]),"Compare")+'</td></tr>')
+        benchmark = (anchor("https://coolcode.ca/businessbench/records/7225/","See restaurant revenue, expenses and profit in Business Bench")
+                     if code == "7225" else anchor("https://coolcode.ca/businessbench/","Compare published industry revenues and expenses in Business Bench"))
         body=(f'<p class="eyebrow">Industry profile · NAICS {code}</p><h1>{e(title)}</h1><p>{e(desc)} '
               'Use Compare beside any location to change either boundary.</p><table><thead><tr><th>Boundary</th><th>Locations</th><th>Explore</th></tr></thead><tbody>'
-              +''.join(lines)+'</tbody></table><p>'+anchor("https://coolcode.ca/businessbench/","Compare published industry revenues and expenses in Business Bench")+'</p>'+source_note(entry))
+              +''.join(lines)+'</tbody></table><p>'+benchmark+'</p>'+source_note(entry))
         save(f"records/industry-{code}/",title,desc,body)
     for a in featured:
         name=area_name(a,geo,entry); title=f"Business locations in {name}"

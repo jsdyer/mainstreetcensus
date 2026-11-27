@@ -48,14 +48,35 @@ class BuildTests(unittest.TestCase):
                 self.assertTrue(target.exists(),str(target))
     def test_langley_halifax_and_industries(self):
         index=json.loads((self.dist/"data/editions.json").read_text())
-        ed=index["editions"][0]; rows=json.loads((self.dist/"data"/ed["id"]/"7225.json").read_text())
+        ed=index["editions"][0]
         for c in ed["comparisons"]:
+            rows = json.loads((self.dist / "data" / ed["id"] / (c["industry"] + ".json")).read_text())
             page=(self.dist/"records"/c["slug"]/"index.html").read_text()
             for area in (c["a"],c["b"]):
-                self.assertIn(f'{rows[area][0]:,}',page)
-        if ed["id"]=="33101176":
-            self.assertEqual([rows[a][0] for a in ["5915001","5915002","1209034","205"]],[302,61,915,935])
+                self.assertIn(f'<strong>{rows[area][0]:,}</strong>', page)
+                self.assertIn(f' · {area}</small>', page)
+            self.assertIn(f'NAICS {c["industry"]}', page)
         self.assertIn("counting-restaurant-locations-in-langley/",(self.dist/"records/langley-restaurant-locations/index.html").read_text())
+
+    def test_current_edition_dimensions_and_cells(self):
+        edition = json.loads((self.dist / "data/editions.json").read_text())["editions"][0]
+        folder = self.dist / "data" / edition["id"]
+        areas = json.loads((folder / "geographies.json").read_text())
+        self.assertEqual(edition["geographies"], len(areas))
+        self.assertEqual(edition["bands"], BANDS)
+        config = json.loads((ROOT / "sources.json").read_text())
+        self.assertEqual(set(edition["industries"]), set(config["industries"]))
+        for area, (name, dguid) in areas.items():
+            self.assertTrue(name.strip(), area)
+            kind = "S0503" if len(area) == 3 else "A0005"
+            self.assertRegex(dguid, rf"^\d{{4}}{kind}{area}$")
+        for code in edition["industries"]:
+            rows = json.loads((folder / (code + ".json")).read_text())
+            self.assertTrue(rows, code)
+            self.assertFalse(rows.keys() - areas.keys(), code)
+            for area, cells in rows.items():
+                self.assertEqual(len(cells), len(BANDS), (code, area))
+                self.assertTrue(all(x is None or type(x) is int and x >= 0 for x in cells), (code, area))
 
     def test_nonmatching_and_older_tables_do_not_override_latest(self):
         fixtures=[{"cubeTitleEn":PREFIX+"June 2026","productId":33101176,"releaseTime":"2026-08-14T00:00:00Z"},
